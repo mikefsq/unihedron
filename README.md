@@ -1,13 +1,11 @@
 # unihedron
 
-A Go driver for **Unihedron Sky Quality Meter (SQM)** devices over their FTDI
-USB-serial link — the **SQM-LU**, and over the same ASCII protocol the **SQM-LU-DL**
-and **SQM-LE**.
+A Go driver for **Unihedron Sky Quality Meter (SQM)** devices. This supports 
+the **SQM-LU** over their FTDI USB-serial link, and the **SQM-LU-DL** and 
+**SQM-LE** over the same ASCII protocol.
 
 The SQM-LU presents itself as an FTDI virtual COM port. The protocol is plain ASCII:
 single-character command types, each reply terminated with `\r\n`. 
-
-Hardware-validated against a live **SQM-LU** (protocol 4, model 3, feature 76).
 
 ## Use
 
@@ -44,9 +42,9 @@ go build ./cmd/sqmsnap
 Command reference: SQM-LU Operator's Manual §8 "Commands and responses"
 ([unihedron.com](https://www.unihedron.com/projects/darksky/cd/)).
 
-Read-only by design: the driver wraps the reading/info/calibration/interval-query
-commands. The calibration-**write** and firmware-upgrade commands (`zcalA/B/D`, `zcal5-8`,
-`0x19`, `:`) are intentionally not wrapped; issue them via `Command` if you must.
+The driver only wraps the reading/info/calibration/interval-query commands. 
+The calibration-**write** and firmware-upgrade commands (`zcalA/B/D`, `zcal5-8`,
+`0x19`, `:`) are intentionally not wrapped but issue them via `Command` if needed.
 
 ## License
 

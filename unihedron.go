@@ -182,7 +182,7 @@ func (s *SQM) Calibration() (Calibration, error) {
 		return Calibration{}, fmt.Errorf("unihedron: malformed calibration response %q", line)
 	}
 	var (
-		c   Calibration
+		c    Calibration
 		err2 error
 	)
 	units := []string{"m", "s", "C", "m", "C"}

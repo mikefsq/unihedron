@@ -16,8 +16,7 @@ import (
 const readTimeout = 100 * time.Millisecond
 
 // probeTimeout bounds the ix identification probe per port during discovery. A real SQM
-// answers ix from stored state in well under a second; a non-SQM FTDI port that accepts
-// the open but never replies as an SQM costs this much before it is skipped.
+// answers ix from stored state in well under a second.
 const probeTimeout = 2 * time.Second
 
 // openPort opens dev at the SQM-LU line speed (8N1) as a Transport. The
