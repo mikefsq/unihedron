@@ -149,6 +149,24 @@ func TestNegativeMagnitude(t *testing.T) {
 	}
 }
 
+func TestDrainsStaleReplyBeforeCommand(t *testing.T) {
+	// A reply left over from an earlier transaction is already pending on the port. It
+	// carries the same 'i' prefix as the one we are about to ask for, so the prefix scan
+	// alone cannot reject it — only draining first keeps it from being read as our answer.
+	f := &fakeT{
+		replies: map[string][]byte{"ix": []byte("i,00000004,00000003,00000076,00005533\r\n")},
+		out:     []byte("i,00000004,00000003,00000076,00009999\r\n"),
+	}
+	s := New(f, DeviceInfo{Port: "fake"})
+	u, err := s.UnitInfo()
+	if err != nil {
+		t.Fatalf("UnitInfo: %v", err)
+	}
+	if u.Serial != 5533 {
+		t.Errorf("serial = %d, want 5533 (stale reply was not drained)", u.Serial)
+	}
+}
+
 func TestTimeout(t *testing.T) {
 	s := newFake(map[string][]byte{}) // nothing answers
 	if _, err := s.Reading(); err == nil {

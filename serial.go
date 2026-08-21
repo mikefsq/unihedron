@@ -25,8 +25,9 @@ const probeTimeout = 2 * time.Second
 //
 // The FTDI bridge emits a few stray bytes (modem-status / reset noise, e.g.
 // 0x00 0xFE 0x00) right after the port is opened; we drain the input buffer here so
-// they don't contaminate the first reply. command() additionally skips to the
-// expected reply prefix, so the two together make the first read robust.
+// they don't contaminate the first reply. command() additionally drains before each
+// command and skips to the expected reply prefix, so together they make the first
+// read as reliable as later ones.
 func openPort(dev string) (Transport, DeviceInfo, error) {
 	port, err := bugst.Open(dev, &bugst.Mode{
 		BaudRate: Baud,

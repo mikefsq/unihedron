@@ -9,10 +9,36 @@ import (
 	"time"
 )
 
-// replyTimeout bounds how long command() waits for a "\r\n"-terminated reply. In
-// period mode (dark skies) a fresh reading can take many seconds to integrate, so this
-// is generous. A var so tests can shrink it.
-var replyTimeout = 10 * time.Second
+// replyTimeout bounds how long command() waits for a "\r\n"-terminated reply. This
+// matches the vendor UDM's SendGet default (header_utils.pas, Timeout=3000), which it
+// applies to readings as well as identity queries. A var so tests can shrink it.
+var replyTimeout = 3 * time.Second
+
+// maxDrainReads bounds drain()'s read loop so a unit streaming timed-interval reports
+// (firmware Feature ≥13) cannot hold the drain open indefinitely.
+const maxDrainReads = 16
+
+// flusher is implemented by transports that can discard already-buffered input — a
+// go.bug.st/serial port does. It is the counterpart of the vendor's ser.Purge.
+type flusher interface{ ResetInputBuffer() error }
+
+// drain discards anything already waiting before a command goes out. UDM does this
+// before every command, and does it twice over — ser.Purge followed by a read loop —
+// because Purge alone proved unreliable on some platforms (header_utils.pas, SendGet).
+// We mirror that: flush the transport's buffer where it offers one, then read off
+// whatever it still hands back.
+func (s *SQM) drain() {
+	if f, ok := s.t.(flusher); ok {
+		_ = f.ResetInputBuffer()
+	}
+	buf := make([]byte, 128)
+	for i := 0; i < maxDrainReads; i++ {
+		n, err := s.t.Read(buf)
+		if err != nil || n == 0 {
+			return
+		}
+	}
+}
 
 // SQM is an opened Unihedron Sky Quality Meter.
 type SQM struct {
@@ -244,10 +270,11 @@ func (s *SQM) Command(prefix byte, cmd string) (string, error) {
 }
 
 // command writes cmd verbatim and returns the first "\r\n"-terminated line whose
-// leading byte is prefix, with the trailing "\r\n" stripped. Scanning to prefix skips
-// the FTDI bridge's power-on noise and any stale bytes, so the first transaction after
-// open is as reliable as later ones. Caller holds mu.
+// leading byte is prefix, with the trailing "\r\n" stripped. Stale input is drained
+// first and the scan then skips to prefix, so neither the FTDI bridge's power-on noise
+// nor a reply left over from an earlier transaction can satisfy this one. Caller holds mu.
 func (s *SQM) command(prefix byte, cmd string) (string, error) {
+	s.drain()
 	if _, err := s.t.Write([]byte(cmd)); err != nil {
 		return "", fmt.Errorf("unihedron: write %q: %w", cmd, err)
 	}
