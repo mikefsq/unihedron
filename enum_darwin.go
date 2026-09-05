@@ -9,11 +9,7 @@ import (
 	bugst "go.bug.st/serial"
 )
 
-// enumeratePorts lists the FTDI VCP ports on macOS by the device-name convention
-// (/dev/cu.usbserial-*). Reading the USB VID on macOS would require the enumerator's
-// cgo (IOKit) path, which has no CGO_ENABLED=0 fallback and so would break
-// cross-compilation to darwin; GetPortsList is pure Go, so discovery here is
-// name-based, matching the FTDI virtual COM port (/dev/cu.usbserial-*).
+// enumeratePorts finds candidate serial ports by macOS device names, without cgo.
 func enumeratePorts() ([]DeviceInfo, error) {
 	names, err := bugst.GetPortsList()
 	if err != nil {

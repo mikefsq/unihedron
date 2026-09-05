@@ -22,11 +22,7 @@ const maxDrainReads = 16
 // go.bug.st/serial port does. It is the counterpart of the vendor's ser.Purge.
 type flusher interface{ ResetInputBuffer() error }
 
-// drain discards anything already waiting before a command goes out. UDM does this
-// before every command, and does it twice over — ser.Purge followed by a read loop —
-// because Purge alone proved unreliable on some platforms (header_utils.pas, SendGet).
-// We mirror that: flush the transport's buffer where it offers one, then read off
-// whatever it still hands back.
+// drain flushes buffered input and reads any remaining bytes before issuing a command.
 func (s *SQM) drain() {
 	if f, ok := s.t.(flusher); ok {
 		_ = f.ResetInputBuffer()
@@ -259,10 +255,7 @@ func (s *SQM) IntervalSettings() (IntervalSettings, error) {
 	return is, nil
 }
 
-// Command issues a raw command string and returns the first reply line beginning with
-// prefix (the response type byte, e.g. 'r', 'i', 'c'), trimmed of its "\r\n". This is
-// the escape hatch for commands not wrapped by a typed method. Note SQM commands are
-// sent verbatim (no line terminator).
+// Command unihedron reads device status and provides diagnostic controls.
 func (s *SQM) Command(prefix byte, cmd string) (string, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()

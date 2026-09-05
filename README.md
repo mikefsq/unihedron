@@ -1,51 +1,81 @@
 # unihedron
 
-A Go driver for **Unihedron Sky Quality Meter (SQM)** devices. This supports 
-the **SQM-LU** over their FTDI USB-serial link, and the **SQM-LU-DL** and 
-**SQM-LE** over the same ASCII protocol.
+Go driver for Unihedron Sky Quality Meters using the SQM-LU USB-serial
+protocol. The built-in transport opens serial ports; it does not provide
+an Ethernet connection for SQM-LE devices.
 
-The SQM-LU presents itself as an FTDI virtual COM port. The protocol is plain ASCII:
-single-character command types, each reply terminated with `\r\n`. 
+## Build and run
 
-## Use
+Requires Go 1.25 or later.
+
+```sh
+go build -o sqmsnap ./cmd/sqmsnap
+./sqmsnap -list
+./sqmsnap -serial 5533
+./sqmsnap -watch 5s -json
+```
+
+The default run reads unit information, calibration, and one sky measurement.
+`-serial` accepts a USB bridge serial or the meter's unit serial. Use `-port`
+for an explicit port, `-ports` to list candidates without opening them, and
+`-unaveraged` for the latest sample without boxcar averaging.
+
+## Use the library
 
 ```go
-sqm, err := unihedron.OpenFirst()      // or OpenPort("/dev/cu.usbserial-XXXX"), OpenBySerial("AG0JWD3W")
-if err != nil { log.Fatal(err) }
-defer sqm.Close()
+package main
 
-info, _ := sqm.UnitInfo()               // protocol / model / feature / serial
-cal,  _ := sqm.Calibration()            // stored calibration constants
-r,    _ := sqm.Reading()                // averaged reading
-fmt.Println(r)                          // 11.19 mag/arcsec², 3248 Hz, 0.000s, 25.1°C
+import (
+    "fmt"
+    "log"
+
+    "github.com/mikefsq/unihedron"
+)
+
+func run() error {
+    device, err := unihedron.OpenFirst()
+    if err != nil {
+        return err
+    }
+    defer device.Close()
+
+    value, err := device.Reading()
+    if err != nil {
+        return err
+    }
+    fmt.Println(value)
+    return nil
+}
+
+func main() {
+    if err := run(); err != nil {
+        log.Fatal(err)
+    }
+}
 ```
 
-`Reading` carries the sky brightness (`MagPerArcsec2`), sensor `FrequencyHz`,
-`PeriodCounts` / `PeriodSeconds`, and sensor `TempC`. `UnaveragedReading()` issues `ux`
-for the most-recent (un-boxcar-averaged) sample. `IntervalSettings()` reads the timed-
-report parameters (firmware feature ≥13). `Command(prefix, raw)` is the escape hatch for
-any command not wrapped by a typed method.
+Readings include `MagPerArcsec2`, `FrequencyHz`, `PeriodCounts`,
+`PeriodSeconds`, and sensor `TempC`. `UnitInfo` returns the meter identity;
+`Calibration` reads calibration constants. `IntervalSettings` requires
+firmware feature level 13 or later.
 
-### CLI — `sqmsnap`
+`OpenBySerial` selects a particular meter. Discovery probes candidate serial
+ports with the identity command to distinguish SQMs from other FTDI devices.
 
+## Platforms and development
+
+Serial I/O supports Linux, macOS, and Windows without cgo. The service user
+must have permission to open the port.
+
+```sh
+go test -race ./...
+GOOS=linux GOARCH=arm64 CGO_ENABLED=0 go build ./...
 ```
-go build ./cmd/sqmsnap
-./sqmsnap                    # unit + calibration + one reading
-./sqmsnap -json              # machine-readable
-./sqmsnap -watch 5s          # poll every 5s
-./sqmsnap -list              # probe FTDI ports; list the ones that are SQMs (bridge + unit serial)
-./sqmsnap -unaveraged        # use ux instead of rx
-```
 
-## Protocol notes
-
-Command reference: SQM-LU Operator's Manual §8 "Commands and responses"
-([unihedron.com](https://www.unihedron.com/projects/darksky/cd/)).
-
-The driver only wraps the reading/info/calibration/interval-query commands. 
-The calibration-**write** and firmware-upgrade commands (`zcalA/B/D`, `zcal5-8`,
-`0x19`, `:`) are intentionally not wrapped but issue them via `Command` if needed.
+The driver wraps reading, identity, calibration-read, and interval queries.
+`Command` exposes raw commands for applications needing other operations.
+Tests use fake transports and captured reply formats.
 
 ## License
 
-MIT — see [LICENSE](LICENSE).
+[MIT](LICENSE).

@@ -1,13 +1,4 @@
-// sqmsnap is a small CLI over the unihedron driver: it opens a Unihedron SQM (by port,
-// by USB serial, or the first one found), prints unit info + calibration + a reading,
-// and can poll readings at an interval. JSON output is available for scripting.
-//
-// A meter that has just been opened does not always answer its first command, and one
-// that has gone quiet has been seen to stay quiet until left alone for a while. So every
-// acquisition here is retried with backoff, and the port is closed while waiting rather
-// than held open — waiting is the part that appears to help, and holding the port open
-// is not waiting. Use -ports when you want to know whether the FTDI bridge is present
-// without touching the meter at all.
+// Command sqmsnap reads device status and provides diagnostic controls.
 package main
 
 import (

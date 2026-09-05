@@ -13,8 +13,7 @@ import (
 // (a hex string; matched case-insensitively).
 const vidFTDI = "0403"
 
-// enumeratePorts lists FTDI (VID 0x0403) USB serial ports via go.bug.st/serial's
-// enumerator, which is pure Go on every non-darwin OS and reports USB VID/PID.
+// enumeratePorts finds candidate serial ports by USB identifiers.
 func enumeratePorts() ([]DeviceInfo, error) {
 	ports, err := enumerator.GetDetailedPortsList()
 	if err != nil {

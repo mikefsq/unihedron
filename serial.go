@@ -19,15 +19,7 @@ const readTimeout = 100 * time.Millisecond
 // answers ix from stored state in well under a second.
 const probeTimeout = 2 * time.Second
 
-// openPort opens dev at the SQM-LU line speed (8N1) as a Transport. The
-// go.bug.st/serial port already satisfies Transport (Read/Write/Close) and its
-// port I/O is pure Go on every OS, so the driver cross-compiles to any target.
-//
-// The FTDI bridge emits a few stray bytes (modem-status / reset noise, e.g.
-// 0x00 0xFE 0x00) right after the port is opened; we drain the input buffer here so
-// they don't contaminate the first reply. command() additionally drains before each
-// command and skips to the expected reply prefix, so together they make the first
-// read as reliable as later ones.
+// openPort opens the serial port at 115200 baud, 8N1, and drains startup noise.
 func openPort(dev string) (Transport, DeviceInfo, error) {
 	port, err := bugst.Open(dev, &bugst.Mode{
 		BaudRate: Baud,
@@ -48,11 +40,7 @@ func openPort(dev string) (Transport, DeviceInfo, error) {
 	return port, DeviceInfo{Port: dev}, nil
 }
 
-// Enumerate lists attached FTDI serial ports (the raw candidate list, not yet
-// identified as SQMs). Matching is per-OS: enum_other.go uses the USB VID via the pure-Go
-// enumerator; enum_darwin.go matches the FTDI device-name convention, deliberately
-// avoiding the enumerator's macOS cgo (IOKit) path so the driver builds for any target
-// with CGO_ENABLED=0. Use Discover to get only the ports that are actually Unihedron SQMs.
+// Enumerate lists candidate FTDI ports without opening them. Discover identifies SQMs.
 func Enumerate() ([]DeviceInfo, error) { return enumeratePorts() }
 
 // Discovered is a Unihedron identified by probing an FTDI serial port: the enumerated
@@ -63,11 +51,8 @@ type Discovered struct {
 	Unit UnitInfo
 }
 
-// Discover enumerates FTDI serial ports and probes each with the ix command, returning
-// only the ports that identify as a Unihedron SQM. Ports that are busy (held exclusively
-// by another driver — e.g. a Pegasus focuser, which also uses FTDI VID 0x0403, on Linux)
-// or that accept the open but don't answer as an SQM are skipped. This reliably separates
-// SQMs from other FTDI devices, so callers don't need to supply a serial number.
+// Discover probes candidate ports with ix and returns those identifying as SQMs.
+// Busy ports and nonmatching replies are skipped.
 func Discover() ([]Discovered, error) {
 	ports, err := enumeratePorts()
 	if err != nil {
@@ -121,15 +106,8 @@ func openInfo(d DeviceInfo) (Transport, DeviceInfo, error) {
 	return t, d, nil
 }
 
-// openBySerial opens the SQM identified by serial, matching either identity:
-//   - the FTDI USB-bridge serial (e.g. "AG0JWD3W"), read from the descriptor before the
-//     port opens — the fast path, no I/O; or
-//   - the SQM's own unit serial number (e.g. "5533", or the zero-padded "00005533" as ix
-//     reports it), found by probing each port.
-//
-// The bridge serial disambiguates several FTDI devices sharing VID 0x0403 and survives
-// replug / port renumbering; the unit serial is the number printed on the meter and shown
-// by Discover. Matching is case-insensitive and trimmed.
+// openBySerial matches either the USB bridge serial or the meter’s unit serial.
+// Matching ignores case, surrounding whitespace, and unit-serial zero padding.
 func openBySerial(serial string) (Transport, DeviceInfo, error) {
 	want := strings.TrimSpace(strings.ToLower(serial))
 	if want == "" {
