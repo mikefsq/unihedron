@@ -255,7 +255,9 @@ func (s *SQM) IntervalSettings() (IntervalSettings, error) {
 	return is, nil
 }
 
-// Command unihedron reads device status and provides diagnostic controls.
+// Command sends cmd verbatim (no line terminator) and returns the first reply line
+// starting with prefix, trimmed of its "\r\n". The escape hatch for commands with
+// no typed method.
 func (s *SQM) Command(prefix byte, cmd string) (string, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
